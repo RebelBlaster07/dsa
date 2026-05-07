@@ -48,9 +48,12 @@ int main(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-    MPI_INT(&argc, &argv);
-    int rank;
-    MPI_rank_world(MPI_COMM_WORLD, &rank);
+    MPI_Init(&argc, &argv);
+
+    int rank, size;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     int data[4];
     int part[2];
@@ -58,34 +61,53 @@ int main(int argc, char *argv[])
     int sum = 0;
     int finalsum = 0;
 
+    // Input by root process
     if (rank == 0)
     {
-        printf("Enter the 4 numbers:\n");
+        printf("Enter 4 numbers:\n");
+
         for (int i = 0; i < 4; i++)
         {
             scanf("%d", &data[i]);
         }
     }
-    MPI_SCATTER(data, 2, MPI_INT, part, 2, MPI_INT, 0, MPI_COMM_WORLD);
 
+    // Divide data
+    MPI_Scatter(data, 2, MPI_INT, part, 2, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // Local sum
     for (int i = 0; i < 2; i++)
     {
         sum += part[i];
     }
 
-    MPI_BARRIER(MPI_COMM_WORLD);
-
-    printf("Process %d sum = %d\n", rank, sum);
-
-    MPI_Reduce(&sum, &finalsum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    MPI_BARRIER(MPI_COMM_WORLD);
-
-    if (rank == 0)
+    // Print process sums in order
+    for (int i = 0; i < size; i++)
     {
-        print("Final sum: %d\n", finalsum);
+        if (rank == i)
+        {
+            printf("Process %d sum = %d\n", rank, sum);
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
     }
 
+    // Combine sums
+    MPI_Reduce(&sum, &finalsum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    // Ensure all process outputs complete
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Final output
+    if (rank == 0)
+    {
+        printf("Final Sum = %d\n", finalsum);
+    }
+
+    MPI_Finalize();
+
+    return 0;
+}
     MPI_Finalize();
     return 0;
 }
